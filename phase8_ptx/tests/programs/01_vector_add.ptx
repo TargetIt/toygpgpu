@@ -1,0 +1,11 @@
+; PTX Test 01: Vector Addition
+; Compute: C[tid] = A[tid] + B[tid]
+.entry vector_add
+{
+    mov.u32 %r0, %tid.x;
+    ld.global.u32 %r1, [0];
+    ld.global.u32 %r2, [8];
+    add.u32 %r3, %r1, %r2;
+    st.global.u32 [16], %r3;
+    ret;
+}
