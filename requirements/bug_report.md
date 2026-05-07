@@ -5,6 +5,7 @@
 2. 更详细的 trace（寄存器变化、向量结果、内存读写）
 3. programs下的.asm文件中注释太少，初学的人无法通过注释快速了解程序的目的以及运作过程
 4. 仓库中没有代码 “仓库里有没有像 GPU shader 那样，一个 thread 里有 float4 / vec4 这种复合数据类型？”，需要增加一个例子模拟这个，最后是新增在某个phase以及之后的phase中。
+5. 似乎只有thread level register，没有warp level register， 比如WID是写入每个warp的thread level register的，每一个thread有一个，而不是一个统一的warp level register。
 
   
 
