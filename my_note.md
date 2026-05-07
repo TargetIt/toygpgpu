@@ -1,6 +1,77 @@
 
 
 # 20260507 
+
+## warp是怎么创建的？ 
+我看了后面的几个 phase，结论是：
+
+**主流创建方式基本没变，仍然是“先确定数量，再批量创建 warp”**，没有看到“运行过程中动态新建一个 warp”这种做法。
+
+可以分成两段看。
+
+**Phase 3 到 Phase 5**
+还是和你现在 `phase2` 很像，`SIMTCore` 初始化时直接建好 warps：
+
+- [phase3_simt_stack/src/simt_core.py](/d:/lab/toygpgpu-main/toygpgpu-main/phase3_simt_stack/src/simt_core.py:59)
+- [phase4_scoreboard/src/simt_core.py](/d:/lab/toygpgpu-main/toygpgpu-main/phase4_scoreboard/src/simt_core.py:61)
+- [phase5_memory/src/simt_core.py](/d:/lab/toygpgpu-main/toygpgpu-main/phase5_memory/src/simt_core.py:67)
+
+核心模式都是这一类：
+
+```python
+self.warps = [Warp(wid, warp_size) for wid in range(num_warps)]
+```
+
+也就是：
+- `num_warps` 先给定
+- `Warp(0)`, `Warp(1)`, ... 一次性创建
+- `load_program()` 时把同一份程序装进去并复位状态
+
+**Phase 6 以后**
+多了一层更接近 CUDA 的 `kernel launch`，但 warp 依然不是动态生出来的，而是**按 block 计算数量后批量创建**。
+
+关键在 [phase6_kernel/src/gpu_sim.py](/d:/lab/toygpgpu-main/toygpgpu-main/phase6_kernel/src/gpu_sim.py:58)：
+
+- `launch_kernel(program, grid_dim, block_dim)`
+- 先算总线程数
+- 再算 `num_warps_per_block`
+- 然后为每个 block 创建一个 `SIMTCore`
+
+对应代码在：
+
+- [phase6_kernel/src/gpu_sim.py](/d:/lab/toygpgpu-main/toygpu-main/phase6_kernel/src/gpu_sim.py:84)
+- [phase6_kernel/src/gpu_sim.py](/d:/lab/toygpgpu-main/toygpu-main/phase6_kernel/src/gpu_sim.py:87)
+
+里面是：
+
+```python
+num_warps_per_block = max(1, total_threads // self.warp_size)
+
+for block_id in range(total_blocks):
+    core = SIMTCore(
+        warp_size=self.warp_size,
+        num_warps=num_warps_per_block,
+        memory_size=self.memory_size
+    )
+```
+
+而 `SIMTCore` 里面仍然还是：
+
+- [phase6_kernel/src/simt_core.py](/d:/lab/toygpu-main/toygpu-main/phase6_kernel/src/simt_core.py:67)
+
+```python
+self.warps = [Warp(wid, warp_size) for wid in range(num_warps)]
+```
+
+后面的 `phase7_pipeline`、`phase8_ptx`、`phase9_tensor`、`phase10_viz` 也延续这个模式。
+
+所以更准确地总结是：
+
+- `phase2-5`：`SIMTCore` 直接按 `num_warps` 预创建
+- `phase6+`：先通过 `grid/block` 计算出每个 block 该有多少 warp，再由每个 `SIMTCore` 预创建
+- 我没看到“执行时按需 spawn 一个新 warp”的实现
+
+如果你愿意，我可以下一步把这个项目里“`thread / warp / block / core` 是怎么一层层创建出来的”画成一张小结构图。
 ## 这里的barrier_count的应用场景是？
 
 我先顺着 warp 和 BAR 的实现看一下 barrier_count 现在有没有真正参与逻辑，再给你讲它在更真实的 SIMT 模型里应该用在什么场景。
