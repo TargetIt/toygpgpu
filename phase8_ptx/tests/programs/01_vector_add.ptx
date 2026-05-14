@@ -1,11 +1,66 @@
-; PTX Test 01: Vector Addition
-; Compute: C[tid] = A[tid] + B[tid]
+; ============================================================
+; Phase 8: PTX Frontend — Vector Addition
+; 阶段 8：PTX 前端 — 向量加法
+;
+; Purpose / 目的:
+;   Demonstrate PTX (Parallel Thread Execution) assembly
+;   format. This is a higher-level intermediate representation
+;   compared to the native .asm format. Uses PTX syntax with
+;   type suffixes (.u32) and named registers (%r0..%r3).
+;   演示 PTX（并行线程执行）汇编格式。相比原生 .asm 格式，
+;   PTX 是更高级的中间表示。
+;
+; Formula / 公式:  C[tid] = A[tid] + B[tid]
+;
+; Expected Result / 预期结果:
+;   mem[16] = A[0] + B[0] = mem[0] + mem[8]
+;
+; Key Concepts / 关键概念:
+;   - .entry: kernel entry point declaration
+;   - %tid.x: thread ID (built-in register)
+;   - .u32: 32-bit unsigned integer type
+;   - ld.global / st.global: global memory access
+;   - PTX uses '%' prefix for registers, not 'r'
+;   - PTX 是 NVIDIA CUDA 使用的中间语言
+;
+; Flow Diagram / 流程图:
+;
+;   START
+;     |
+;     v
+;   mov.u32 %r0, %tid.x    ← %r0 = tid
+;     |
+;     v
+;   ld.global.u32 %r1, [0] ← %r1 = A[tid] = mem[0]
+;   ld.global.u32 %r2, [8] ← %r2 = B[tid] = mem[8]
+;     |
+;     v
+;   add.u32 %r3, %r1, %r2  ← %r3 = A[tid] + B[tid]
+;     |
+;     v
+;   st.global.u32 [16], %r3 ← mem[16] = %r3
+;     |
+;     v
+;   ret                    ← return / 返回
+; ============================================================
+
+; 内核入口: vector_add / Kernel entry point
 .entry vector_add
 {
-    mov.u32 %r0, %tid.x;
-    ld.global.u32 %r1, [0];
-    ld.global.u32 %r2, [8];
-    add.u32 %r3, %r1, %r2;
-    st.global.u32 [16], %r3;
+    ; 获取线程 ID / Get thread ID
+    mov.u32 %r0, %tid.x;     ; %r0 = tid
+
+    ; 从全局内存加载 A[tid] 和 B[tid]
+    ; Load A[tid] and B[tid] from global memory
+    ld.global.u32 %r1, [0];  ; %r1 = mem[0 + tid] = A[tid]
+    ld.global.u32 %r2, [8];  ; %r2 = mem[8 + tid] = B[tid]
+
+    ; 执行向量加法 / Perform vector addition
+    add.u32 %r3, %r1, %r2;   ; %r3 = A[tid] + B[tid]
+
+    ; 将结果写回全局内存 / Store result to global memory
+    st.global.u32 [16], %r3; ; mem[16 + tid] = %r3
+
+    ; 内核返回 / Return from kernel
     ret;
 }

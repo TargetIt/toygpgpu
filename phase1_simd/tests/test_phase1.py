@@ -12,6 +12,7 @@ from register_file import RegisterFile
 from vector_register_file import VectorRegisterFile
 from alu import ALU
 from vector_alu import VectorALU
+from vec4_alu import Vec4ALU
 from memory import Memory
 from cpu import CPU
 from assembler import assemble
@@ -33,7 +34,7 @@ def check(cond, name):
 def run_asm_test(asm_file, checks):
     global passed, failed
     path = os.path.join(os.path.dirname(__file__), 'programs', asm_file)
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         prog = assemble(f.read())
     cpu = CPU()
     cpu.load_program(prog)
@@ -92,6 +93,42 @@ def test_vector_alu():
     check(valu.vadd(neg_a, b) == [9, 18, 27, 36, 45, 54, 63, 72], "VADD negative")
 
 
+def test_vec4_alu():
+    print("\n--- Vec4ALU Tests ---")
+    # V4PACK: pack 4 byte values
+    a = 0x0503  # bytes: 0x03, 0x05
+    b = 0x0907  # bytes: 0x07, 0x09
+    packed = Vec4ALU.pack(a, b)
+    check(packed == 0x09070503, f"V4PACK 0x09070503 == 0x{packed:08X}")
+
+    # V4ADD: per-byte SIMD add
+    v1 = 0x09070503  # (3, 5, 7, 9)
+    v2 = 0x04030201  # (1, 2, 3, 4)
+    add_result = Vec4ALU.add(v1, v2)
+    check(add_result == 0x0D0A0704, f"V4ADD 0x0D0A0704 == 0x{add_result:08X}")
+
+    # V4MUL: per-byte SIMD mul
+    mul_result = Vec4ALU.mul(v1, v2)
+    check(mul_result == 0x24150A03, f"V4MUL 0x24150A03 == 0x{mul_result:08X}")
+
+    # V4UNPACK: extract byte lanes
+    packed = 0x0D0A0704  # (4, 7, 10, 13)
+    check(Vec4ALU.unpack(packed, 0) == 4, "V4UNPACK lane 0 = 4")
+    check(Vec4ALU.unpack(packed, 1) == 7, "V4UNPACK lane 1 = 7")
+    check(Vec4ALU.unpack(packed, 2) == 10, "V4UNPACK lane 2 = 10")
+    check(Vec4ALU.unpack(packed, 3) == 13, "V4UNPACK lane 3 = 13")
+
+    # Edge: lane out of range (4, 5, 6, 7) wraps via & 3
+    check(Vec4ALU.unpack(packed, 4) == 4, "V4UNPACK lane 4 -> lane 0 = 4")
+    check(Vec4ALU.unpack(packed, 7) == 13, "V4UNPACK lane 7 -> lane 3 = 13")
+
+    # Overflow: add byte overflow wraps to 8-bit
+    v3 = 0xFE020100  # (0, 1, 2, 254)
+    v4 = 0x01010101  # (1, 1, 1, 1)
+    overflow = Vec4ALU.add(v3, v4)
+    check(overflow == 0xFF030201, f"V4ADD overflow 0xFF030201 == 0x{overflow:08X}")
+
+
 def test_isa_vector():
     print("\n--- ISA Vector Tests ---")
     for opcode, name in [(OP_VADD, "VADD"), (OP_VSUB, "VSUB"),
@@ -106,6 +143,24 @@ def test_isa_vector():
     check(decode(w).opcode == OP_VST, "VST encode/decode")
     w = encode_itype(OP_VMOV, 3, 42)
     check(decode(w).opcode == OP_VMOV, "VMOV encode/decode")
+
+    # Vec4 ISA encode/decode
+    for opcode, name in [(OP_V4PACK, "V4PACK"), (OP_V4ADD, "V4ADD"),
+                          (OP_V4MUL, "V4MUL")]:
+        w = encode_rtype(opcode, 1, 2, 3)
+        instr = decode(w)
+        check(instr.opcode == opcode, f"{name} encode/decode (opcode=0x{opcode:02X})")
+        check(instr.rd == 1, f"{name} rd=1")
+        check(instr.rs1 == 2, f"{name} rs1=2")
+        check(instr.rs2 == 3, f"{name} rs2=3")
+
+    # V4UNPACK is R-type: rd, rs1, lane (lane in rs2 field)
+    w = encode_rtype(OP_V4UNPACK, 5, 7, 2)  # rd=5, rs1=7, lane=2
+    instr = decode(w)
+    check(instr.opcode == OP_V4UNPACK, "V4UNPACK encode/decode")
+    check(instr.rd == 5, "V4UNPACK rd=5")
+    check(instr.rs1 == 7, "V4UNPACK rs1=7")
+    check(instr.rs2 == 2, "V4UNPACK lane=2")
 
 
 def test_assembler_vector():
@@ -169,6 +224,35 @@ def test_programs():
     # Test 05: Phase 0 backward compatibility
     run_asm_test("05_phase0_compat.asm", {0: 8, 1: 42, 2: 50, 3: 50})
 
+    # Test 06: Vec4 Pack/Add/Mul/Unpack Demo
+    def check_vec4(cpu):
+        mem0 = cpu.memory.read_word(0)
+        mem1 = cpu.memory.read_word(1)
+        mem2 = cpu.memory.read_word(2)
+        mem3 = cpu.memory.read_word(3)
+        mem4 = cpu.memory.read_word(4)
+        mem5 = cpu.memory.read_word(5)
+        mem6 = cpu.memory.read_word(6)
+        mem7 = cpu.memory.read_word(7)
+        if mem0 != 0x09070503:
+            return False, f"mem[0] = 0x{mem0:08X} != 0x09070503"
+        if mem1 != 0x04030201:
+            return False, f"mem[1] = 0x{mem1:08X} != 0x04030201"
+        if mem2 != 0x0D0A0704:
+            return False, f"mem[2] = 0x{mem2:08X} != 0x0D0A0704"
+        if mem3 != 0x24150A03:
+            return False, f"mem[3] = 0x{mem3:08X} != 0x24150A03"
+        if mem4 != 4:
+            return False, f"mem[4] = {mem4} != 4"
+        if mem5 != 7:
+            return False, f"mem[5] = {mem5} != 7"
+        if mem6 != 10:
+            return False, f"mem[6] = {mem6} != 10"
+        if mem7 != 13:
+            return False, f"mem[7] = {mem7} != 13"
+        return True, "Vec4 demo all results correct"
+    run_asm_test("06_vec4_demo.asm", check_vec4)
+
 
 def main():
     global passed, failed
@@ -178,6 +262,7 @@ def main():
 
     test_vector_register_file()
     test_vector_alu()
+    test_vec4_alu()
     test_isa_vector()
     test_assembler_vector()
     test_programs()

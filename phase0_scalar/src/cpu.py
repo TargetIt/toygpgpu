@@ -12,12 +12,12 @@ Phase 0 实现最简执行模型: Fetch → Decode → Execute → Writeback
 """
 
 try:
-    from .isa import Instruction, decode, OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_LD, OP_ST, OP_MOV
+    from .isa import Instruction, decode, OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_LD, OP_ST, OP_MOV, OPCODE_NAMES
     from .register_file import RegisterFile
     from .alu import ALU
     from .memory import Memory
 except ImportError:
-    from isa import Instruction, decode, OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_LD, OP_ST, OP_MOV
+    from isa import Instruction, decode, OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV, OP_LD, OP_ST, OP_MOV, OPCODE_NAMES
     from register_file import RegisterFile
     from alu import ALU
     from memory import Memory
@@ -138,17 +138,67 @@ class CPU:
             raise ValueError(f"Unknown opcode: 0x{op:02X} at pc={self.pc - 1}")
 
     def run(self, trace: bool = False):
-        """运行程序直到 HALT
-
-        对应 GPGPU-Sim 中 gpgpu_sim::launch() 启动 kernel 后循环 cycle()
-        直到所有线程终止。
-        """
+        """Run program until HALT with optional trace."""
+        cycle = 0
+        if trace:
+            self._t_regs = {i: self.reg_file.read(i) for i in range(16)}
+            self._t_mem = {}
+            for i in range(self.memory.size_words):
+                v = self.memory.read_word(i)
+                if v != 0:
+                    self._t_mem[i] = v
         while self.step():
             if trace:
-                print(f"[pc={self.pc - 1:03d}] executed, regs: "
-                      f"{[self.reg_file.read(i) for i in range(8)]}...")
+                self._trace_step(cycle)
+            cycle += 1
         if trace:
-            print(f"\n[HALT] Instructions executed: {self.instr_count}")
+            print(f"[Summary] {cycle} cycles, {self.instr_count} instructions")
+
+    def _snapshot_regs(self) -> dict:
+        return {i: self.reg_file.read(i) for i in range(16)}
+
+    def _snapshot_mem(self) -> dict:
+        snap = {}
+        for i in range(self.memory.size_words):
+            v = self.memory.read_word(i)
+            if v != 0:
+                snap[i] = v
+        return snap
+
+    def _trace_step(self, cycle: int):
+        exec_pc = self.pc - 1 if not self.halted and self.pc > 0 else self.pc
+        if exec_pc < 0 or exec_pc >= len(self.program):
+            self._update_trace_state()
+            return
+        raw_word = self.program[exec_pc]
+        instr = decode(raw_word)
+        opname = OPCODE_NAMES.get(instr.opcode, '?')
+        curr_regs = self._snapshot_regs()
+        reg_parts = []
+        for i in range(16):
+            ov = self._t_regs.get(i, 0)
+            nv = curr_regs.get(i, 0)
+            if ov != nv:
+                reg_parts.append(f"r{i}:{ov}->{nv}")
+        reg_str = ' '.join(reg_parts) if reg_parts else "none"
+        curr_mem = self._snapshot_mem()
+        mem_parts = []
+        for addr, nv in curr_mem.items():
+            ov = self._t_mem.get(addr, 0)
+            if ov != nv:
+                mem_parts.append(f"mem[{addr}]:{ov}->{nv}")
+        mem_str = (' | ' + ', '.join(mem_parts[:4])) if mem_parts else ''
+        print(f"[Cycle {cycle}] PC={exec_pc}: {opname} rd=r{instr.rd} rs1=r{instr.rs1} rs2=r{instr.rs2} imm={instr.imm} | reg: {reg_str}{mem_str}")
+        self._t_regs = curr_regs
+        self._t_mem = curr_mem
+
+    def _update_trace_state(self):
+        self._t_regs = {i: self.reg_file.read(i) for i in range(16)}
+        self._t_mem = {}
+        for i in range(self.memory.size_words):
+            v = self.memory.read_word(i)
+            if v != 0:
+                self._t_mem[i] = v
 
     def dump_state(self) -> str:
         """打印 CPU 完整状态（调试用）"""

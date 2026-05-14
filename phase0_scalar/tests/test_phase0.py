@@ -46,7 +46,7 @@ def run_asm_test(asm_file, checks):
     """
     global passed, failed
     asm_path = os.path.join(os.path.dirname(__file__), 'programs', asm_file)
-    with open(asm_path) as f:
+    with open(asm_path, encoding='utf-8') as f:
         program = assemble(f.read())
 
     cpu = CPU()

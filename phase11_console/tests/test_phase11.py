@@ -91,7 +91,7 @@ def test_console_smoke():
 def test_divergence_display():
     print("\n--- Divergence Display Test ---")
     path = os.path.join(os.path.dirname(__file__), 'programs', 'demo_divergence.asm')
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         prog = assemble(f.read())
     simt = SIMTCore(warp_size=4, num_warps=1, memory_size=256)
     simt.load_program(prog)

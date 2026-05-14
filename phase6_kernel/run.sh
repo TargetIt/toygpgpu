@@ -1,5 +1,14 @@
 #!/bin/bash
 set -e; cd "$(dirname "$0")"
+
+# --trace: run a demo program with trace output
+if [ "$1" = "--trace" ]; then
+    DEMO="${2:-tests/programs/01_gto_schedule.asm}"
+    echo "--- Trace: $DEMO ---"
+    PYTHONIOENCODING=utf-8 python3 src/learning_console.py "$DEMO" --auto --max-cycles 500
+    exit $?
+fi
+
 echo "╔══════════════════════════════════════════════╗"
 echo "║  Phase 6: Kernel Launch & Scheduling         ║"
 echo "╚══════════════════════════════════════════════╝"

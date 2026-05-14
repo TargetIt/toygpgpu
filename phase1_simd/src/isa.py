@@ -38,6 +38,12 @@ OP_VLD  = 0x15  # vd[i] = mem[addr + i] (连续加载)
 OP_VST  = 0x16  # mem[addr + i] = vs[i] (连续存储)
 OP_VMOV = 0x17  # vd[i] = sign_ext(imm) (广播)
 
+# --- Vec4 复合数据类型指令 (Phase 1+ 扩展) ---
+OP_V4PACK   = 0x25  # rd = pack(rs1[7:0], rs1[15:8], rs2[7:0], rs2[15:8])
+OP_V4ADD    = 0x26  # rd[i] = rs1[i] + rs2[i] for i in 0..3 (4×8-bit SIMD add)
+OP_V4MUL    = 0x27  # rd[i] = rs1[i] * rs2[i] for i in 0..3 (4×8-bit SIMD mul)
+OP_V4UNPACK = 0x28  # extract byte lane: rd = (rs1 >> (imm*8)) & 0xFF
+
 # 操作码名称映射
 OPCODE_NAMES = {
     OP_HALT: "HALT", OP_ADD: "ADD", OP_SUB: "SUB",
@@ -46,10 +52,15 @@ OPCODE_NAMES = {
     OP_VADD: "VADD", OP_VSUB: "VSUB", OP_VMUL: "VMUL",
     OP_VDIV: "VDIV", OP_VLD: "VLD", OP_VST: "VST",
     OP_VMOV: "VMOV",
+    OP_V4PACK: "V4PACK", OP_V4ADD: "V4ADD", OP_V4MUL: "V4MUL",
+    OP_V4UNPACK: "V4UNPACK",
 }
 
 # 向量操作码集合（用于快速判断）
 VECTOR_OPS = {OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV, OP_VLD, OP_VST, OP_VMOV}
+
+# Vec4 操作码集合（用于快速判断）
+VEC4_OPS = {OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK}
 
 # 是否是向量指令
 def is_vector(opcode: int) -> bool:

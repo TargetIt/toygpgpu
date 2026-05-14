@@ -19,7 +19,7 @@ def pack(lo, hi):
 def run_mma_test(f, preload, checks):
     global passed, failed
     path = os.path.join(os.path.dirname(__file__), 'programs', f)
-    with open(path) as fp: prog = assemble(fp.read())
+    with open(path, encoding='utf-8') as fp: prog = assemble(fp.read())
     simt = SIMTCore(warp_size=1, num_warps=1, memory_size=1024)
     for addr, val in preload.items():
         simt.memory.write_word(addr, val)

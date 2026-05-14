@@ -1,9 +1,58 @@
-; PTX Test 03: Basic mov + add with immediates
+; ============================================================
+; Phase 8: PTX Frontend — Move Immediate and Add
+; 阶段 8：PTX 前端 — 立即数移动与加法
+;
+; Purpose / 目的:
+;   Demonstrate basic PTX mov with immediates and add.
+;   This is the simplest PTX program, equivalent to
+;   Phase 0's basic arithmetic but in PTX syntax.
+;   演示基本的 PTX 立即数移动和加法指令。
+;
+; Formula / 公式:  mem[0] = 10 + 5 = 15
+;
+; Expected Result / 预期结果:
+;   mem[0] = 15
+;
+; Key Concepts / 关键概念:
+;   - PTX mov with two different immediate values
+;   - PTX add with register operands
+;   - st.global to write result
+;   - No thread ID used here (scalar PTX)
+;   - PTX 的基本指令格式与原生 .asm 类似但语法不同
+;
+; Flow Diagram / 流程图:
+;
+;   START
+;     |
+;     v
+;   mov.u32 %r0, 10     ← %r0 = 10 (立即数)
+;     |
+;     v
+;   mov.u32 %r1, 5      ← %r1 = 5 (立即数)
+;     |
+;     v
+;   add.u32 %r2, %r0, %r1 ← %r2 = 10 + 5 = 15
+;     |
+;     v
+;   st.global.u32 [0], %r2 ← mem[0] = 15
+;     |
+;     v
+;   ret                 ← return / 返回
+; ============================================================
+
+; 内核入口: basic / Kernel entry point
 .entry basic
 {
-    mov.u32 %r0, 10;
-    mov.u32 %r1, 5;
-    add.u32 %r2, %r0, %r1;
-    st.global.u32 [0], %r2;
+    ; 加载立即数到寄存器 / Load immediates into registers
+    mov.u32 %r0, 10;       ; %r0 = 10 (第一个操作数 / first operand)
+    mov.u32 %r1, 5;        ; %r1 = 5  (第二个操作数 / second operand)
+
+    ; 执行加法 / Perform addition
+    add.u32 %r2, %r0, %r1; ; %r2 = 10 + 5 = 15 (和 / sum)
+
+    ; 将结果写入全局内存 / Write result to global memory
+    st.global.u32 [0], %r2; ; mem[0] = 15
+
+    ; 内核返回 / Return from kernel
     ret;
 }

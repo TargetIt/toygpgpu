@@ -48,6 +48,29 @@ OP_JMP = 0x08  # 无条件跳转: PC = PC + imm
 OP_BEQ = 0x09  # rs1 == rs2 时跳转
 OP_BNE = 0x0A  # rs1 != rs2 时跳转
 
+# --- 谓词指令 (Phase 3: Predication) ---
+OP_SETP = 0x24  # 设置谓词: imm[0]=0 表示 EQ, imm[0]=1 表示 NE
+
+# @p0 谓词标志位 (指令字 bit 31, opcode 字段高位)
+# decode() 会将 opcode 与 0x7F 做 & 运算来剥离谓词标志
+PRED_FLAG = 0x80000000
+
+# --- Warp-level register instructions ---
+OP_WREAD  = 0x2A  # rd = warp_reg[imm]
+OP_WWRITE = 0x2B  # warp_reg[imm] = rs1
+# --- Vec4 composite data type instructions (Phase 1+ extension) ---
+OP_V4PACK   = 0x25  # rd = pack(rs1[7:0], rs1[15:8], rs2[7:0], rs2[15:8])
+OP_V4ADD    = 0x26  # rd[i] = rs1[i] + rs2[i] for i in 0..3 (4x8-bit SIMD add)
+OP_V4MUL    = 0x27  # rd[i] = rs1[i] * rs2[i] for i in 0..3 (4x8-bit SIMD mul)
+OP_V4UNPACK = 0x28  # extract byte lane: rd = (rs1 >> (lane*8)) & 0xFF, lane in rs2
+
+
+# Warp register name → index mapping
+WREG_NAMES = {
+    'wid': 0,
+    'ntid': 1,
+}
+
 # 操作码名称映射
 OPCODE_NAMES = {
     OP_HALT: "HALT", OP_ADD: "ADD", OP_SUB: "SUB",
@@ -58,10 +81,17 @@ OPCODE_NAMES = {
     OP_VMOV: "VMOV",
     OP_TID: "TID", OP_WID: "WID", OP_BAR: "BAR",
     OP_JMP: "JMP", OP_BEQ: "BEQ", OP_BNE: "BNE",
+    OP_SETP: "SETP",
+    OP_WREAD: "WREAD", OP_WWRITE: "WWRITE",
+    OP_V4PACK: "V4PACK", OP_V4ADD: "V4ADD", OP_V4MUL: "V4MUL",
+    OP_V4UNPACK: "V4UNPACK",
 }
 
 # 向量操作码集合（用于快速判断）
 VECTOR_OPS = {OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV, OP_VLD, OP_VST, OP_VMOV}
+
+# Vec4 opcode set (for quick checking)
+VEC4_OPS = {OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK}
 
 # 是否是向量指令
 def is_vector(opcode: int) -> bool:
@@ -95,7 +125,7 @@ def decode(word: int) -> Instruction:
 
     对应 GPGPU-Sim 中 ptx_parser 将 PTX 指令翻译为内部表示的过程。
     """
-    opcode = (word >> 24) & 0xFF
+    opcode = (word >> 24) & 0x7F  # 7-bit opcode, bit 31 为谓词标志
     rd     = (word >> 20) & 0xF
     rs1    = (word >> 16) & 0xF
     rs2    = (word >> 12) & 0xF

@@ -67,6 +67,19 @@ class IBuffer:
                 e.ready = True
                 return
 
+    def peek(self) -> Optional[IBufferEntry]:
+        """查看下一条就绪指令 (不消费, 用于重汇聚判断等)"""
+        best_idx = -1
+        best_pc = float('inf')
+        for i in range(self.capacity):
+            if self.entries[i].valid and self.entries[i].ready:
+                if self.entries[i].pc < best_pc:
+                    best_pc = self.entries[i].pc
+                    best_idx = i
+        if best_idx >= 0:
+            return self.entries[best_idx]
+        return None
+
     def consume(self) -> Optional[IBufferEntry]:
         """取出一条就绪指令 (FIFO: 最小 PC = 最老指令)"""
         best_idx = -1

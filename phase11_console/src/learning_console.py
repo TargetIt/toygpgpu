@@ -116,6 +116,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'reg':
                 print_registers(simt)
                 continue
+            elif cmd.lower() == 'wreg':
+                print_warp_regs(simt)
+                continue
             elif cmd.lower() == 'sb':
                 print_scoreboard(simt)
                 continue
@@ -277,6 +280,19 @@ def print_ibuffer(simt):
         print(f"W{w.warp_id} I-Buffer: {w.ibuffer}")
 
 
+def print_warp_regs(simt):
+    """Print warp-level uniform registers"""
+    from isa import WREG_NAMES
+    rev = {v: k for k, v in WREG_NAMES.items()}
+    print(c("--- Warp Registers ---", 'bold'))
+    for w in simt.warps:
+        wregs = []
+        for idx, val in sorted(w.warp_regs.items()):
+            name = rev.get(idx, 'wreg%d' % idx)
+            wregs.append("%s=%d" % (name, val))
+        print("  Warp %d: %s" % (w.warp_id, ', '.join(wregs)))
+
+
 def print_simt_stack(simt):
     for w in simt.warps:
         print(f"W{w.warp_id} SIMT Stack ({len(w.simt_stack)}):")
@@ -296,6 +312,7 @@ def main():
     args = {
         'warp_size': 4, 'num_warps': 1,
         'auto_interval': 0, 'max_cycles': 500,
+        'auto': False,
     }
 
     # 解析选项
@@ -309,6 +326,12 @@ def main():
             args['auto_interval'] = float(sys.argv[i+1]); i += 2
         elif sys.argv[i] == '--max-cycles':
             args['max_cycles'] = int(sys.argv[i+1]); i += 2
+        elif sys.argv[i] == '--auto':
+            args['auto'] = True
+            i += 1
+        elif sys.argv[i] == '--trace':
+            args['auto'] = True
+            i += 1
         else:
             i += 1
 
@@ -320,6 +343,12 @@ def main():
         num_warps=args['num_warps'],
         memory_size=1024
     )
+
+    if args.get('auto'):
+        prog = assemble(program_text)
+        simt.load_program(prog)
+        simt.run(trace=True)
+        return
 
     run_console(simt, program_text, args)
 

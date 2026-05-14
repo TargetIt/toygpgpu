@@ -32,6 +32,7 @@ class Thread:
     def __init__(self, thread_id: int, num_regs: int = 16):
         self.thread_id = thread_id
         self.reg_file = RegisterFile(num_regs)
+        self.pred = False  # 谓词寄存器，默认 false
 
     def read_reg(self, reg_id: int) -> int:
         return self.reg_file.read(reg_id)
@@ -77,6 +78,10 @@ class Warp:
         self.done = False
         from simt_stack import SIMTStack
         self.simt_stack = SIMTStack()
+        # Warp-level uniform registers shared by all threads
+        self.warp_regs = {}
+        self.warp_regs[0] = warp_id    # wid
+        self.warp_regs[1] = warp_size  # ntid
         from scoreboard import Scoreboard
         self.scoreboard = Scoreboard()
         self.scoreboard_stalled = False  # warp 被 scoreboard stall

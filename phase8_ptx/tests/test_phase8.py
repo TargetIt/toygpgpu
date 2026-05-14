@@ -51,7 +51,7 @@ def test_programs():
 
     # Test 01: Vector Add (PTX)
     path = os.path.join(os.path.dirname(__file__), 'programs')
-    with open(f'{path}/01_vector_add.ptx') as f:
+    with open(f'{path}/01_vector_add.ptx', encoding='utf-8') as f:
         code, asm = assemble_ptx(f.read())
     print(f"  Generated asm:\n{asm}\n")
     simt = SIMTCore(warp_size=4, num_warps=1, memory_size=1024)
@@ -69,7 +69,7 @@ def test_programs():
             failed += 1; print(f"  ❌ 01_vector_add.ptx: C[{i}] = {actual}, expected {exp}")
 
     # Test 02: Scale (PTX)
-    with open(f'{path}/02_scale.ptx') as f:
+    with open(f'{path}/02_scale.ptx', encoding='utf-8') as f:
         code, asm = assemble_ptx(f.read())
     simt2 = SIMTCore(warp_size=4, num_warps=1, memory_size=1024)
     for i in range(4):
@@ -84,7 +84,7 @@ def test_programs():
             failed += 1; print(f"  ❌ 02_scale.ptx: C[{i}] = {actual}, expected {exp}")
 
     # Test 03: Basic mov+add (PTX)
-    with open(f'{path}/03_mov_imm.ptx') as f:
+    with open(f'{path}/03_mov_imm.ptx', encoding='utf-8') as f:
         code, asm = assemble_ptx(f.read())
     simt3 = SIMTCore(warp_size=1, num_warps=1, memory_size=1024)
     simt3.load_program(code)

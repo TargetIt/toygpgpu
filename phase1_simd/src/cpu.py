@@ -15,22 +15,28 @@ try:
                       OP_ADD, OP_SUB, OP_MUL, OP_DIV,
                       OP_LD, OP_ST, OP_MOV,
                       OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV,
-                      OP_VLD, OP_VST, OP_VMOV)
+                      OP_VLD, OP_VST, OP_VMOV,
+                      OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
+                      OPCODE_NAMES, VECTOR_OPS)
     from .register_file import RegisterFile
     from .vector_register_file import VectorRegisterFile
     from .alu import ALU
     from .vector_alu import VectorALU
+    from .vec4_alu import Vec4ALU
     from .memory import Memory
 except ImportError:
     from isa import (Instruction, decode, OP_HALT,
                      OP_ADD, OP_SUB, OP_MUL, OP_DIV,
                      OP_LD, OP_ST, OP_MOV,
                      OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV,
-                     OP_VLD, OP_VST, OP_VMOV)
+                     OP_VLD, OP_VST, OP_VMOV,
+                     OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
+                     OPCODE_NAMES, VECTOR_OPS)
     from register_file import RegisterFile
     from vector_register_file import VectorRegisterFile
     from alu import ALU
     from vector_alu import VectorALU
+    from vec4_alu import Vec4ALU
     from memory import Memory
 
 
@@ -69,6 +75,7 @@ class CPU:
         self.vec_reg_file = VectorRegisterFile(vlen, 8)
         self.alu = ALU()
         self.vec_alu = VectorALU(vlen)
+        self.vec4_alu = Vec4ALU()
         self.memory = Memory(memory_size)
         self.program: list[int] = []
         self.halted = False
@@ -172,16 +179,109 @@ class CPU:
         elif op == OP_VMOV:
             self.vec_reg_file.broadcast(instr.rd, instr.imm)
 
+        # ---- Vec4 指令 (Phase 1+ 扩展) ----
+        elif op == OP_V4PACK:
+            a = self.reg_file.read(instr.rs1)
+            b = self.reg_file.read(instr.rs2)
+            self.reg_file.write(instr.rd, self.vec4_alu.pack(a, b))
+
+        elif op == OP_V4ADD:
+            a = self.reg_file.read(instr.rs1)
+            b = self.reg_file.read(instr.rs2)
+            self.reg_file.write(instr.rd, self.vec4_alu.add(a, b))
+
+        elif op == OP_V4MUL:
+            a = self.reg_file.read(instr.rs1)
+            b = self.reg_file.read(instr.rs2)
+            self.reg_file.write(instr.rd, self.vec4_alu.mul(a, b))
+
+        elif op == OP_V4UNPACK:
+            a = self.reg_file.read(instr.rs1)
+            lane = instr.rs2 & 3
+            self.reg_file.write(instr.rd, self.vec4_alu.unpack(a, lane))
+
         else:
             raise ValueError(f"Unknown opcode: 0x{op:02X} at pc={self.pc - 1}")
 
     def run(self, trace: bool = False):
-        """运行程序直到 HALT"""
+        """Run until HALT with optional trace."""
+        cycle = 0
+        if trace:
+            self._t_regs = {i: self.reg_file.read(i) for i in range(16)}
+            self._t_vregs = {i: [self.vreg_file.read(i, lane) for lane in range(self.vlen)] for i in range(8)}
+            self._t_mem = {}
+            for i in range(self.memory.size_words):
+                v = self.memory.read_word(i)
+                if v != 0:
+                    self._t_mem[i] = v
         while self.step():
             if trace:
-                print(f"[pc={self.pc - 1:03d}] {instr_name(self.program[self.pc - 1])}")
+                self._trace_step(cycle)
+            cycle += 1
         if trace:
-            print(f"\n[HALT] Instructions: {self.instr_count}")
+            print(f"[Summary] {cycle} cycles, {self.instr_count} instructions")
+
+    def _snapshot_regs(self) -> dict:
+        return {i: self.reg_file.read(i) for i in range(16)}
+
+    def _snapshot_vregs(self) -> dict:
+        return {i: [self.vreg_file.read(i, lane) for lane in range(self.vlen)] for i in range(8)}
+
+    def _snapshot_mem(self) -> dict:
+        snap = {}
+        for i in range(self.memory.size_words):
+            v = self.memory.read_word(i)
+            if v != 0:
+                snap[i] = v
+        return snap
+
+    def _trace_step(self, cycle: int):
+        exec_pc = self.pc - 1 if not self.halted and self.pc > 0 else self.pc
+        if exec_pc < 0 or exec_pc >= len(self.program):
+            self._update_trace_state()
+            return
+        raw_word = self.program[exec_pc]
+        instr = decode(raw_word)
+        opname = OPCODE_NAMES.get(instr.opcode, '?')
+        is_vector = instr.opcode in VECTOR_OPS
+        curr_regs = self._snapshot_regs()
+        reg_parts = []
+        for i in range(16):
+            ov = self._t_regs.get(i, 0)
+            nv = curr_regs.get(i, 0)
+            if ov != nv:
+                reg_parts.append(f"r{i}:{ov}->{nv}")
+        reg_str = ' '.join(reg_parts) if reg_parts else "none"
+        vreg_parts = []
+        if is_vector:
+            curr_vregs = self._snapshot_vregs()
+            for vi in range(8):
+                ov_list = self._t_vregs.get(vi, [0]*self.vlen)
+                nv_list = curr_vregs.get(vi, [0]*self.vlen)
+                if ov_list != nv_list:
+                    vreg_parts.append(f"v{vi}:{ov_list}->{nv_list}")
+        curr_mem = self._snapshot_mem()
+        mem_parts = []
+        for addr, nv in curr_mem.items():
+            ov = self._t_mem.get(addr, 0)
+            if ov != nv:
+                mem_parts.append(f"mem[{addr}]:{ov}->{nv}")
+        mem_str = (' | mem: ' + ', '.join(mem_parts[:4])) if mem_parts else ''
+        vreg_str = (' | vreg: ' + ', '.join(vreg_parts[:4])) if vreg_parts else ''
+        print(f"[Cycle {cycle}] PC={exec_pc}: {opname} rd=r{instr.rd} rs1=r{instr.rs1} rs2=r{instr.rs2} imm={instr.imm} | reg: {reg_str}{vreg_str}{mem_str}")
+        self._t_regs = curr_regs
+        if is_vector:
+            self._t_vregs = curr_vregs
+        self._t_mem = curr_mem
+
+    def _update_trace_state(self):
+        self._t_regs = {i: self.reg_file.read(i) for i in range(16)}
+        self._t_vregs = {i: [self.vreg_file.read(i, lane) for lane in range(self.vlen)] for i in range(8)}
+        self._t_mem = {}
+        for i in range(self.memory.size_words):
+            v = self.memory.read_word(i)
+            if v != 0:
+                self._t_mem[i] = v
 
     def dump_state(self) -> str:
         """打印 CPU 完整状态"""

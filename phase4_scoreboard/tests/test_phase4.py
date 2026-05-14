@@ -16,7 +16,7 @@ def check(cond, name):
 def run_prog(f, checks):
     global passed, failed
     path = os.path.join(os.path.dirname(__file__), 'programs', f)
-    with open(path) as fp: prog = assemble(fp.read())
+    with open(path, encoding='utf-8') as fp: prog = assemble(fp.read())
     simt = SIMTCore(warp_size=8, num_warps=1, memory_size=1024)
     simt.load_program(prog)
     simt.run()
@@ -66,7 +66,7 @@ def test_programs():
                 return False, f"mem[200+{tid}] != {tid*2+2}"
         return True, "all correct"
     path = os.path.join(os.path.dirname(__file__), 'programs', '05_backward_compat.asm')
-    with open(path) as fp: prog = assemble(fp.read())
+    with open(path, encoding='utf-8') as fp: prog = assemble(fp.read())
     simt = SIMTCore(warp_size=8, num_warps=1, memory_size=1024)
     simt.load_program(prog)
     simt.run()

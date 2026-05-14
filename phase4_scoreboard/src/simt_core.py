@@ -18,8 +18,12 @@ try:
                       OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV,
                       OP_LD, OP_ST, OP_MOV,
                       OP_TID, OP_WID, OP_BAR,
-                      OP_JMP, OP_BEQ, OP_BNE)
+                      OP_JMP, OP_BEQ, OP_BNE, OP_SETP, PRED_FLAG,
+                      OP_WREAD, OP_WWRITE,
+                      OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
+                      OPCODE_NAMES)
     from .alu import ALU
+    from .vec4_alu import Vec4ALU
     from .memory import Memory
     from .warp import Warp
     from .scheduler import WarpScheduler
@@ -30,8 +34,12 @@ except ImportError:
                      OP_HALT, OP_ADD, OP_SUB, OP_MUL, OP_DIV,
                      OP_LD, OP_ST, OP_MOV,
                      OP_TID, OP_WID, OP_BAR,
-                     OP_JMP, OP_BEQ, OP_BNE)
+                     OP_JMP, OP_BEQ, OP_BNE, OP_SETP, PRED_FLAG,
+                     OP_WREAD, OP_WWRITE,
+                     OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
+                     OPCODE_NAMES)
     from alu import ALU
+    from vec4_alu import Vec4ALU
     from memory import Memory
     from warp import Warp
     from scheduler import WarpScheduler
@@ -62,6 +70,7 @@ class SIMTCore:
         self.scheduler = WarpScheduler(self.warps)
         self.memory = Memory(memory_size)
         self.alu = ALU()
+        self.vec4_alu = Vec4ALU()
         self.program: list[int] = []
         self.instr_count = 0
 
@@ -97,10 +106,14 @@ class SIMTCore:
 
         warp = self.scheduler.select_warp()
         if warp is None:
+            self._last_warp_id = -1
             return self.scheduler.has_active_warps()  # 继续推进 scoreboard
+        self._last_warp_id = warp.warp_id
+        self._last_reconv_happened = False
 
         # ---- 重汇聚检测 (GPGPU-Sim: simt_stack::at_reconvergence) ----
         if warp.simt_stack.at_reconvergence(warp.pc):
+            self._last_reconv_happened = True
             self._handle_reconvergence(warp)
             # reconvergence 可能更新 PC，本周期不执行指令
             if warp.done:
@@ -161,6 +174,14 @@ class SIMTCore:
             warp.active_mask = entry.orig_mask
             warp.pc = entry.reconv_pc
 
+    def _exec_threads(self, warp, instr):
+        """返回应执行当前指令的线程列表 (考虑 active_mask + 谓词)"""
+        active = warp.active_threads()
+        # 检查 @p0 谓词标志 (bit 31)
+        if instr.raw & PRED_FLAG:
+            return [t for t in active if t.pred]
+        return active
+
     def _execute_warp(self, warp: Warp, instr: Instruction, old_pc: int):
         """对 warp 内所有 active 线程执行指令"""
         op = instr.opcode
@@ -175,13 +196,38 @@ class SIMTCore:
             return
 
         if op == OP_TID:
-            for t in warp.active_threads():
+            for t in self._exec_threads(warp, instr):
                 t.write_reg(instr.rd, t.thread_id)
             return
 
         if op == OP_WID:
-            for t in warp.active_threads():
+            for t in self._exec_threads(warp, instr):
                 t.write_reg(instr.rd, warp.warp_id)
+            return
+
+        # ---- Warp-level register read/write ----
+        if op == OP_WREAD:
+            wreg_idx = instr.imm & 0xF
+            value = warp.read_warp_reg(wreg_idx)
+            for t in self._exec_threads(warp, instr):
+                t.write_reg(instr.rd, value)
+            return
+        if op == OP_WWRITE:
+            wreg_idx = instr.imm & 0xF
+            tlist = self._exec_threads(warp, instr)
+            if tlist:
+                value = tlist[0].read_reg(instr.rs1)
+                warp.write_warp_reg(wreg_idx, value)
+            return
+
+        # ---- 谓词指令 (Phase 3: Predication) ----
+        if op == OP_SETP:
+            is_eq = (instr.imm & 1) == 0  # imm[0]=0 → EQ, 1 → NE
+            for t in warp.active_threads():
+                if is_eq:
+                    t.pred = (t.read_reg(instr.rs1) == t.read_reg(instr.rs2))
+                else:
+                    t.pred = (t.read_reg(instr.rs1) != t.read_reg(instr.rs2))
             return
 
         # ---- 分支指令 (Phase 3) ----
@@ -189,44 +235,73 @@ class SIMTCore:
             self._execute_branch(warp, instr, old_pc)
             return
 
+        tlist = self._exec_threads(warp, instr)
+
         # ---- ALU ----
         if op == OP_ADD:
-            for t in warp.active_threads():
+            for t in tlist:
                 a, b = t.read_reg(instr.rs1), t.read_reg(instr.rs2)
                 t.write_reg(instr.rd, self.alu.add(a, b))
             return
         if op == OP_SUB:
-            for t in warp.active_threads():
+            for t in tlist:
                 a, b = t.read_reg(instr.rs1), t.read_reg(instr.rs2)
                 t.write_reg(instr.rd, self.alu.sub(a, b))
             return
         if op == OP_MUL:
-            for t in warp.active_threads():
+            for t in tlist:
                 a, b = t.read_reg(instr.rs1), t.read_reg(instr.rs2)
                 t.write_reg(instr.rd, self.alu.mul(a, b))
             return
         if op == OP_DIV:
-            for t in warp.active_threads():
+            for t in tlist:
                 a, b = t.read_reg(instr.rs1), t.read_reg(instr.rs2)
                 t.write_reg(instr.rd, self.alu.div(a, b))
             return
         if op == OP_MOV:
-            for t in warp.active_threads():
+            for t in tlist:
                 t.write_reg(instr.rd, instr.imm)
             return
 
         # ---- LD/ST ----
         if op == OP_LD:
             base = instr.imm & 0x3FF
-            for t in warp.active_threads():
+            for t in tlist:
                 addr = (base + t.thread_id) & 0x3FF
                 t.write_reg(instr.rd, self.memory.read_word(addr))
             return
         if op == OP_ST:
             base = instr.imm & 0x3FF
-            for t in warp.active_threads():
+            for t in tlist:
                 addr = (base + t.thread_id) & 0x3FF
                 self.memory.write_word(addr, t.read_reg(instr.rs1))
+            return
+
+
+        # ---- Vec4 instructions (Phase 1+ extension) ----
+        if op == OP_V4PACK:
+            for t in tlist:
+                a = t.read_reg(instr.rs1)
+                b = t.read_reg(instr.rs2)
+                t.write_reg(instr.rd, self.vec4_alu.pack(a, b))
+            return
+        if op == OP_V4ADD:
+            for t in tlist:
+                a = t.read_reg(instr.rs1)
+                b = t.read_reg(instr.rs2)
+                t.write_reg(instr.rd, self.vec4_alu.add(a, b))
+            return
+        if op == OP_V4MUL:
+            for t in tlist:
+                a = t.read_reg(instr.rs1)
+                b = t.read_reg(instr.rs2)
+                t.write_reg(instr.rd, self.vec4_alu.mul(a, b))
+            return
+        if op == OP_V4UNPACK:
+            for t in tlist:
+                a = t.read_reg(instr.rs1)
+                lane = instr.rs2 & 3
+                t.write_reg(instr.rd, self.vec4_alu.unpack(a, lane))
             return
 
         raise ValueError(f"Unknown opcode: 0x{op:02X}")
@@ -295,11 +370,117 @@ class SIMTCore:
             return PIPELINE_LATENCY['mem']
         if opcode in (OP_HALT, OP_BAR, OP_JMP, OP_BEQ, OP_BNE):
             return 0  # 控制指令不写寄存器
+        if opcode in (OP_WWRITE,):
+            return 0  # Writes to warp register, not thread register
         return PIPELINE_LATENCY.get('default', 1)
 
     def run(self, trace: bool = False):
+        cycle = 0
+        if trace:
+            self._t_regs = self._snapshot_regs()
+            self._t_mem = self._snapshot_mem()
+            self._t_pcs = {w.warp_id: w.pc for w in self.warps}
+            self._t_masks = {w.warp_id: w.active_mask for w in self.warps}
+            self._t_stack_len = {w.warp_id: len(w.simt_stack.entries) for w in self.warps}
         while self.step():
-            pass
+            if trace:
+                self._trace_step(cycle)
+            cycle += 1
+        if trace:
+            print(f"[Summary] {cycle} cycles, {self.instr_count} instructions")
+
+    def _snapshot_regs(self) -> dict:
+        snap = {}
+        for w in self.warps:
+            for t in w.threads:
+                for i in range(16):
+                    v = t.read_reg(i)
+                    if v != 0:
+                        snap[(w.warp_id, t.thread_id, i)] = v
+        return snap
+
+    def _snapshot_mem(self) -> dict:
+        snap = {}
+        for i in range(self.memory.size_words):
+            v = self.memory.read_word(i)
+            if v != 0:
+                snap[i] = v
+        return snap
+
+    def _trace_step(self, cycle: int):
+        wid = self._last_warp_id
+        if wid < 0:
+            return
+        warp = self.warps[wid]
+        old_pc = self._t_pcs.get(wid, -1)
+        old_stack_len = self._t_stack_len.get(wid, 0)
+        curr_stack_len = len(warp.simt_stack.entries)
+        new_mask = warp.active_mask
+        old_mask = self._t_masks.get(wid, 0)
+        mask_str = bin(new_mask)[2:].zfill(self.warp_size)
+        if getattr(self, '_last_reconv_happened', False):
+            exec_pc = warp.pc - 1
+            if 0 <= exec_pc < len(self.program):
+                raw = self.program[exec_pc]
+                inst = decode(raw)
+                print(f"[Cycle {cycle}] W{wid} RECONVERGE: mask={mask_str} path=PC{exec_pc}: {OPCODE_NAMES.get(inst.opcode, '?')} rd=r{inst.rd}")
+            self._update_trace_state()
+            return
+        if old_pc < 0 or old_pc >= len(self.program):
+            self._update_trace_state()
+            return
+        raw_word = self.program[old_pc]
+        instr = decode(raw_word)
+        opname = OPCODE_NAMES.get(instr.opcode, '?')
+        if instr.opcode in (OP_JMP, OP_BEQ, OP_BNE):
+            target_pc = old_pc + 1 + instr.imm
+            if instr.opcode == OP_JMP:
+                desc = f"{opname} -> PC{target_pc}"
+            else:
+                desc = f"{opname} r{instr.rs1},r{instr.rs2} -> PC{target_pc}"
+        else:
+            desc = f"{opname} rd=r{instr.rd} rs1=r{instr.rs1} rs2=r{instr.rs2} imm={instr.imm}"
+        parts = [f"[Cycle {cycle}] W{wid} PC={old_pc}: {desc} | active=0b{mask_str}"]
+        curr_regs = self._snapshot_regs()
+        reg_diffs = []
+        for (w_, t_, r_), nv in curr_regs.items():
+            if w_ == wid:
+                ov = self._t_regs.get((w_, t_, r_), 0)
+                if ov != nv:
+                    reg_diffs.append(f"T{t_}:r{r_}={ov}->{nv}")
+        if reg_diffs:
+            reg_str = ', '.join(reg_diffs[:8])
+            if len(reg_diffs) > 8:
+                reg_str += f" (+{len(reg_diffs)-8})"
+            parts.append(f"reg: {reg_str}")
+        curr_mem = self._snapshot_mem()
+        mem_diffs = []
+        for addr, nv in curr_mem.items():
+            ov = self._t_mem.get(addr, 0)
+            if ov != nv:
+                mem_diffs.append(f"mem[{addr}]={nv}")
+        if mem_diffs:
+            mem_str = ', '.join(mem_diffs[:4])
+            if len(mem_diffs) > 4:
+                mem_str += f" (+{len(mem_diffs)-4})"
+            parts.append(f"mem: {mem_str}")
+        if curr_stack_len > old_stack_len:
+            not_taken = old_mask & ~new_mask
+            if not_taken:
+                parts.append(f"DIVERGE: taken=0b{new_mask:0{self.warp_size}b} not_taken=0b{not_taken:0{self.warp_size}b}")
+        print(' | '.join(parts))
+        self._t_regs = curr_regs
+        self._t_mem = curr_mem
+        self._t_pcs[wid] = warp.pc
+        self._t_masks[wid] = warp.active_mask
+        self._t_stack_len[wid] = curr_stack_len
+
+    def _update_trace_state(self):
+        self._t_regs = self._snapshot_regs()
+        self._t_mem = self._snapshot_mem()
+        self._t_pcs = {w.warp_id: w.pc for w in self.warps}
+        self._t_masks = {w.warp_id: w.active_mask for w in self.warps}
+        self._t_stack_len = {w.warp_id: len(w.simt_stack.entries) for w in self.warps}
 
     def dump_state(self) -> str:
         lines = ["=" * 60, "SIMT Core State (Phase 3: SIMT Stack)",

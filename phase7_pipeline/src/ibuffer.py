@@ -67,6 +67,13 @@ class IBuffer:
                 e.ready = True
                 return
 
+    def peek(self) -> Optional[IBufferEntry]:
+        """查看下一条就绪指令 (不消费, 用于重汇聚判断等)"""
+        for i in range(self.capacity):
+            if self.entries[i].valid and self.entries[i].ready:
+                return self.entries[i]
+        return None
+
     def consume(self) -> Optional[IBufferEntry]:
         """取出一条就绪指令 (issue 时调用)"""
         # 取最老的 ready 指令 (FIFO)

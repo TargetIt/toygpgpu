@@ -28,7 +28,7 @@ def run_prog(asm_file, cpu_checks=None, checks=None):
     """运行汇编测试。cpu_checks: callable(simt) → (ok, msg)"""
     global passed, failed
     path = os.path.join(os.path.dirname(__file__), 'programs', asm_file)
-    with open(path) as f:
+    with open(path, encoding='utf-8') as f:
         prog = assemble(f.read())
     simt = SIMTCore(warp_size=8, num_warps=2, memory_size=1024)
     simt.load_program(prog)

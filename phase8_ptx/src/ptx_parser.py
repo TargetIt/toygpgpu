@@ -50,12 +50,17 @@ TOKEN_RE = re.compile(r"""
 
 def tokenize(source: str) -> List[str]:
     """词法分析: PTX 源码 → token 列表"""
-    # 去除注释 (; 开头行, // 注释)
+    # 去除注释 (; 开头行, // 行注释, 行内 ; 注释)
     clean_lines = []
     for line in source.split('\n'):
-        line = line.split('//')[0].strip()
-        if line.startswith(';'):
-            continue  # PTX comment line
+        line = line.split('//')[0]  # 去除 // 注释
+        # 保留第一个 ; 作为语句终止符, 去除之后的 ; 行内注释
+        if ';' in line:
+            first = line.index(';')
+            line = line[:first+1]  # 保留第一个 ; (语句终止符)
+        line = line.strip()
+        if line.startswith(';') or not line:
+            continue  # 整行 ; 注释 或 空行
         clean_lines.append(line)
     source = '\n'.join(clean_lines)
 

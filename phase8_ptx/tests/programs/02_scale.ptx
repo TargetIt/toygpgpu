@@ -1,11 +1,64 @@
-; PTX Test 02: Scale
-; C[tid] = A[tid] * 3
+; ============================================================
+; Phase 8: PTX Frontend — Vector Scale
+; 阶段 8：PTX 前端 — 向量缩放
+;
+; Purpose / 目的:
+;   Demonstrate PTX format for vector scaling: C[tid] = A[tid] * 3.
+;   Shows mov with immediate, and mul.lo.u32 (low 32-bit multiply).
+;   演示 PTX 格式的向量缩放操作。
+;
+; Formula / 公式:  C[tid] = A[tid] * 3
+;
+; Expected Result / 预期结果:
+;   mem[20] = A[0] * 3 = mem[10] * 3
+;
+; Key Concepts / 关键概念:
+;   - mov.u32 with immediate value (3)
+;   - mul.lo.u32: low 32-bit multiplication
+;   - Register allocation is managed by the PTX assembler
+;   - PTX 支持在 mov 中使用立即数
+;
+; Flow Diagram / 流程图:
+;
+;   START
+;     |
+;     v
+;   mov.u32 %r0, %tid.x    ← %r0 = tid
+;     |
+;     v
+;   ld.global.u32 %r1, [10] ← %r1 = A[tid] = mem[10]
+;     |
+;     v
+;   mov.u32 %r2, 3          ← %r2 = 3 (标量立即数)
+;     |
+;     v
+;   mul.lo.u32 %r3, %r1, %r2 ← %r3 = A[tid] * 3
+;     |
+;     v
+;   st.global.u32 [20], %r3  ← mem[20] = %r3
+;     |
+;     v
+;   ret                     ← return / 返回
+; ============================================================
+
+; 内核入口: scale / Kernel entry point
 .entry scale
 {
-    mov.u32 %r0, %tid.x;
-    ld.global.u32 %r1, [10];
-    mov.u32 %r2, 3;
-    mul.lo.u32 %r3, %r1, %r2;
-    st.global.u32 [20], %r3;
+    ; 获取线程 ID / Get thread ID
+    mov.u32 %r0, %tid.x;     ; %r0 = tid
+
+    ; 从全局内存加载 A[tid] / Load A[tid] from global memory
+    ld.global.u32 %r1, [10]; ; %r1 = mem[10 + tid] = A[tid]
+
+    ; 加载标量乘数 / Load scalar multiplier
+    mov.u32 %r2, 3;          ; %r2 = 3 (标量 / scalar)
+
+    ; 执行乘法 (低 32 位) / Perform low 32-bit multiplication
+    mul.lo.u32 %r3, %r1, %r2; ; %r3 = A[tid] * 3
+
+    ; 将结果写回全局内存 / Store result to global memory
+    st.global.u32 [20], %r3; ; mem[20 + tid] = %r3
+
+    ; 内核返回 / Return from kernel
     ret;
 }

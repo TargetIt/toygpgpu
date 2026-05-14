@@ -22,6 +22,7 @@ try:
         OP_LD, OP_ST, OP_MOV,
         OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV,
         OP_VLD, OP_VST, OP_VMOV,
+        OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
         encode_rtype, encode_itype, encode_stype
     )
 except ImportError:
@@ -30,6 +31,7 @@ except ImportError:
         OP_LD, OP_ST, OP_MOV,
         OP_VADD, OP_VSUB, OP_VMUL, OP_VDIV,
         OP_VLD, OP_VST, OP_VMOV,
+        OP_V4PACK, OP_V4ADD, OP_V4MUL, OP_V4UNPACK,
         encode_rtype, encode_itype, encode_stype
     )
 
@@ -146,6 +148,26 @@ def _assemble_line(line: str) -> int:
         vs = _parse_vreg(parts[1])
         addr = _parse_mem_addr(parts[2])
         return encode_stype(OP_VST, vs, addr)
+
+    # ---- Vec4 指令 (Phase 1+ 扩展) ----
+    elif mnemonic in ('V4ADD', 'V4MUL'):
+        rd = _parse_reg(parts[1])
+        rs1 = _parse_reg(parts[2])
+        rs2 = _parse_reg(parts[3])
+        opcode = {'V4ADD': OP_V4ADD, 'V4MUL': OP_V4MUL}[mnemonic]
+        return encode_rtype(opcode, rd, rs1, rs2)
+
+    elif mnemonic == 'V4PACK':
+        rd = _parse_reg(parts[1])
+        rs1 = _parse_reg(parts[2])
+        rs2 = _parse_reg(parts[3])
+        return encode_rtype(OP_V4PACK, rd, rs1, rs2)
+
+    elif mnemonic == 'V4UNPACK':
+        rd = _parse_reg(parts[1])
+        rs1 = _parse_reg(parts[2])
+        lane = _parse_int(parts[3])
+        return encode_rtype(OP_V4UNPACK, rd, rs1, lane)
 
     else:
         raise ValueError(f"Unknown instruction: {mnemonic}")

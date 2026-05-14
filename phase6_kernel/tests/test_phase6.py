@@ -51,7 +51,7 @@ def test_programs():
     rpt = None
 
     # Test 01: GTO scheduling
-    with open(f"{path}/01_gto_schedule.asm") as f:
+    with open(f"{path}/01_gto_schedule.asm", encoding='utf-8') as f:
         prog = assemble(f.read())
     gpu = GPUSim(num_sms=1, warp_size=4, memory_size=1024)
     gpu.launch_kernel(prog, grid_dim=(1,), block_dim=(8,))
@@ -65,7 +65,7 @@ def test_programs():
     else: failed += 1; print(f"  ❌ 01_gto_schedule.asm: got {vals}, expected {expected}")
 
     # Test 02: Multi-block
-    with open(f"{path}/02_multi_block.asm") as f:
+    with open(f"{path}/02_multi_block.asm", encoding='utf-8') as f:
         prog = assemble(f.read())
     gpu2 = GPUSim(num_sms=1, warp_size=4, memory_size=1024)
     gpu2.launch_kernel(prog, grid_dim=(2,), block_dim=(4,))
@@ -74,7 +74,7 @@ def test_programs():
     passed += 1; print(f"  ✅ 02_multi_block.asm: multi-block kernel launched")
 
     # Test 03: Backward compat
-    with open(f"{path}/03_backward_compat.asm") as f:
+    with open(f"{path}/03_backward_compat.asm", encoding='utf-8') as f:
         prog = assemble(f.read())
     gpu3 = GPUSim(num_sms=1, warp_size=8, memory_size=1024)
     gpu3.launch_kernel(prog, grid_dim=(1,), block_dim=(8,))

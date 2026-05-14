@@ -32,6 +32,7 @@ class Thread:
     def __init__(self, thread_id: int, num_regs: int = 16):
         self.thread_id = thread_id
         self.reg_file = RegisterFile(num_regs)
+        self.pred = False  # 谓词寄存器，默认 false
 
     def read_reg(self, reg_id: int) -> int:
         return self.reg_file.read(reg_id)
@@ -77,6 +78,10 @@ class Warp:
         self.done = False
         from simt_stack import SIMTStack
         self.simt_stack = SIMTStack()
+        # Warp-level uniform registers shared by all threads
+        self.warp_regs = {}
+        self.warp_regs[0] = warp_id    # wid
+        self.warp_regs[1] = warp_size  # ntid
         from scoreboard import Scoreboard
         self.scoreboard = Scoreboard()
         self.scoreboard_stalled = False
@@ -97,6 +102,14 @@ class Warp:
     def is_active(self, thread_id: int) -> bool:
         return bool((self.active_mask >> thread_id) & 1)
 
+    def read_warp_reg(self, reg_idx: int) -> int:
+        """Read warp-level uniform register by index."""
+        return self.warp_regs.get(reg_idx, 0)
+
+    def write_warp_reg(self, reg_idx: int, value: int):
+        """Write warp-level uniform register by index."""
+        self.warp_regs[reg_idx] = value
+
     def reset_barrier(self):
         """重置 barrier 状态"""
         self.at_barrier = False
@@ -106,6 +119,8 @@ class Warp:
         lines = [f"Warp {self.warp_id}: PC={self.pc}, "
                  f"active=0b{self.active_mask:0{self.warp_size}b}, "
                  f"barrier={self.at_barrier}, done={self.done}"]
+        reg_str = ", ".join(f"wreg[{k}]={v}" for k, v in sorted(self.warp_regs.items()))
+        lines.append(f"  WarpRegs: {reg_str}")
         for t in self.threads:
             lines.append(f"  {t.dump_regs()}")
         return "\n".join(lines)
