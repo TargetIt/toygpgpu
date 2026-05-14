@@ -1,3 +1,7 @@
+
+# 20260514
+1. 参考phase11，为每个phase下增加learning_console.py， 方便观测每个用例。
+2. 请你自己执行learning_console.py， 确认打印出来的log是否符合该程序的设计预期。
 # 20260509
 1. 只有DPC分支，没有PRED分支；
 2. 
