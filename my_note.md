@@ -54,6 +54,44 @@ taken_mask
 fallthrough_pc
   没跳转那条路径的入口，也就是之后要补跑的 PC。
 
+## 分支中active mask是怎么计算的？ 
+
+
+完整过程是：
+
+```text
+PC04 BEQ 发散
+  taken_mask = 01010101
+  orig_mask  = 11111111
+  fallthrough_pc = 5
+  active_mask = 01010101
+  pc = 8
+
+PC08/PC09/PC10 执行偶数路径
+
+PC10 JMP 到 PC11，并把 reconv_pc 修正为 11
+
+下一轮 step:
+  发现 pc == reconv_pc
+  调用 _handle_reconvergence()
+
+_handle_reconvergence:
+  remaining_mask = orig_mask & ~taken_mask
+                 = 11111111 & ~01010101
+                 = 10101010
+  active_mask = 10101010
+  pc = fallthrough_pc = 5
+
+于是 PC05 用奇数线程执行
+```
+
+所以你的说法可以记成：
+
+```text
+PC5 的 active_mask = orig_mask & ~taken_mask
+```
+
+不是裸的 `~taken_mask`。这样更准确，也更接近真实 SIMT stack 的语义。
 
 # 20260507 
 
