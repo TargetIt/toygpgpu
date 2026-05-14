@@ -1,7 +1,7 @@
 
 # 20260514
 
-## Q10：PC10 执行完后，怎么知道要从 stack 找 PC5 执行？
+## phase3 Q10：PC10 执行完后，怎么知道要从 stack 找 PC5 执行？
 
 ```
 PC00 -> PC01 -> PC02 -> PC03 -> PC04
@@ -41,7 +41,7 @@ PC05
 active_mask = 10101010
 也就是让奇数线程继续执行未执行路径。
 
-## SIMT stack entry 里几个字段怎么记？
+## phase3 SIMT stack entry 里几个字段怎么记？
 reconv_pc
   重汇聚点。执行到这里时，要检查是否还有另一条路径没跑。
 
@@ -54,7 +54,7 @@ taken_mask
 fallthrough_pc
   没跳转那条路径的入口，也就是之后要补跑的 PC。
 
-## 分支中active mask是怎么计算的？ 
+## phase3 分支中active mask是怎么计算的？ 
 
 
 完整过程是：
@@ -92,6 +92,20 @@ PC5 的 active_mask = orig_mask & ~taken_mask
 ```
 
 不是裸的 `~taken_mask`。这样更准确，也更接近真实 SIMT stack 的语义。
+
+## phase4 phase4_scoreboard 引入scoreboard，解决冲突，那在phase3/2/1中的冲突是如何解决的
+Phase4 在 phase4_scoreboard/src/scoreboard.py (line 31) 里维护 reserved: reg -> remaining_cycles，并在 phase4_scoreboard/src/simt_core.py (line 123) issue 前检查：
+python
+if sb.check_waw(instr.rd) or sb.check_raw(instr.rs1, instr.rs2):
+    warp.scoreboard_stalled = True
+所以 phase4 开始把“写回尚未完成”显式建模出来。之前 phase1/2/3 不是靠 scoreboard 解决，而是靠无流水线、单指令原子执行、立即写回这个简化假设避开了 RAW/WAW。
+
+所以本质上：
+
+phase1/2/3：假设所有指令立即写回，所以没有可见冲突
+phase4：引入“写回延迟”，所以相邻指令可能碰到未完成的寄存器写
+一句话：Phase4 有冲突，是因为它开始模拟真实硬件里“指令发射”和“结果写回”不是同一时刻发生。
+
 
 # 20260507 
 
