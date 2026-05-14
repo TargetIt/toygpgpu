@@ -1,4 +1,57 @@
 
+# 20260514
+
+## Q10：PC10 执行完后，怎么知道要从 stack 找 PC5 执行？
+
+PC00 -> PC01 -> PC02 -> PC03 -> PC04
+                                  │
+                    ┌─────────────┴─────────────┐
+                    │                           │
+              偶数线程跳转                  奇数线程顺序执行
+                    │                           │
+                    v                           v
+              PC08 -> PC09 -> PC10        PC05 -> PC06 -> PC07
+                    │                           │
+                    └─────────────┬─────────────┘
+                                  v
+                           PC11 -> PC12 -> PC13
+
+不是 PC10 直接找 PC5，而是分两步：
+
+PC10 JMP 到 PC11
+下一轮 step 发现 PC11 是栈顶 reconv_pc
+于是触发 _handle_reconvergence()
+PC10 执行后：
+
+warp.pc = 11
+stack.top.reconv_pc = 11
+下一轮 step() 开头检查：
+
+if warp.simt_stack.at_reconvergence(warp.pc):
+    self._handle_reconvergence(warp)
+匹配成功，于是从 stack entry 里取出：
+
+fallthrough_pc = 5
+remaining_mask = 10101010
+然后切换到：
+
+PC05
+active_mask = 10101010
+也就是让奇数线程继续执行未执行路径。
+
+## SIMT stack entry 里几个字段怎么记？
+reconv_pc
+  重汇聚点。执行到这里时，要检查是否还有另一条路径没跑。
+
+orig_mask
+  发散前的完整活跃线程集合。
+
+taken_mask
+  已经执行过的线程集合。
+
+fallthrough_pc
+  没跳转那条路径的入口，也就是之后要补跑的 PC。
+
 
 # 20260507 
 
