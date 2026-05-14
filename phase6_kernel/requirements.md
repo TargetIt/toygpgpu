@@ -1,5 +1,16 @@
 # Phase 6: Kernel Launch & Scheduling — 需求
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive debugger with kernel-level views. Supports the `perf` command to display performance counters including IPC, warp occupancy, and stall reason breakdowns.
+- **PRED (predication) support**: Added `OP_SETP` instruction (opcode 0x24), `@p0` prefix syntax for conditional execution, and per-thread predication bit tracking (same as Phase 3).
+- **Warp-level uniform registers**: Added `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions for warp-level register read/write operations (same as Phase 3).
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with kernel-level state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 补齐 GPU 编程模型的最后一环：**Kernel Launch（grid/block 两级并行）** 和 **GTO 调度策略**。

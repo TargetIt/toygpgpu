@@ -1,3 +1,29 @@
+## Quick Start
+
+Interactive debugging with learning_console.py (PTX translation pipeline):
+
+```bash
+# Interactive debugging with PTX program
+python src/learning_console.py tests/programs/01_vector_add.ptx --warp-size 4
+
+# Batch trace mode
+python src/learning_console.py tests/programs/01_vector_add.ptx --trace --warp-size 4
+
+# Scale kernel demo
+python src/learning_console.py tests/programs/02_scale.ptx --warp-size 4
+
+# Run with more cycles for longer programs
+python src/learning_console.py tests/programs/03_mov_imm.ptx --max-cycles 300
+```
+
+## New in this update
+
+- **learning_console.py**: Interactive PTX debugger with virtual-to-physical register allocation display, PTX->ISA translation pipeline inspection
+- **Trace mode**: `--trace` for batch execution with translation and execution trace
+- **PRED/Predication**: `@p0` predicate support in PTX translator, SETP mapping from PTX setp instructions
+- **vec4/float4 instructions**: V4PACK/V4ADD/V4MUL/V4UNPACK support in the PTX-to-ISA translation layer
+- **Warp-level registers**: WREAD/WWRITE accessible from translated PTX kernels
+
 # Phase 8: PTX Frontend
 
 PTX 解析器 + 翻译器，将 CUDA PTX 子集编译为 toygpgpu 内部 ISA。

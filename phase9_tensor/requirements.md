@@ -1,5 +1,17 @@
 # Phase 9: Tensor Core — MMA 指令
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added a tensor-aware interactive debugger. Supports the `mma` command to inspect MMA (matrix multiply-accumulate) instruction operands and results, including packed 16-bit element views.
+- **Fixed IBuffer peek and reconvergence bug**: Added `peek()` method to IBuffer for non-destructive instruction inspection, and fixed the SIMT stack reconvergence check logic (same fix as Phase 7).
+- **PRED (predication) support**: Added `OP_SETP` instruction (opcode 0x24), `@p0` prefix syntax for conditional execution, and per-thread predication bit tracking (same as Phase 3).
+- **Warp-level uniform registers**: Added `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions for warp-level register read/write operations (same as Phase 3).
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 实现简化版 Tensor Core 的矩阵乘累加 (MMA) 指令。

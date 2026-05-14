@@ -1,5 +1,16 @@
 # Phase 5: 内存层次 — 需求分解
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive debugger with memory hierarchy views. Supports the `cache` command to inspect L1 cache lines, tags, hit/miss counters, and the `smem` command to view shared memory contents per block.
+- **PRED (predication) support**: Added `OP_SETP` instruction (opcode 0x24), `@p0` prefix syntax for conditional execution, and per-thread predication bit tracking (same as Phase 3).
+- **Warp-level uniform registers**: Added `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions for warp-level register read/write operations (same as Phase 3).
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with memory hierarchy state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 从平坦内存升级为 **GPU 风格的多层内存体系**。

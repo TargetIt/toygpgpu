@@ -1,5 +1,16 @@
 # Phase 1: SIMD 向量处理器 — 需求分解
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive debugger with scalar and vector register views. Supports the `vreg` command to inspect vector register contents across all lanes.
+- **vec4_alu.py (Vec4ALU)**: Added a 4x8-bit SIMD composite data type that packs four 8-bit values into a single 32-bit register, providing a simplified sub-word SIMD execution model.
+- **V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added new opcodes (0x26-0x29) for packed 4x8-bit SIMD operations — pack four bytes into a register, add/multiply packed elements, and unpack results back to individual bytes.
+- **06_vec4_demo.asm**: Added a demo program showcasing Vec4ALU operations including packing, parallel addition, multiplication, and unpacking.
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 将 Phase 0 的标量处理器扩展为 **SIMD（Single Instruction, Multiple Data）向量处理器**。

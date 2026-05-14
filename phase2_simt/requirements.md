@@ -1,5 +1,14 @@
 # Phase 2: SIMT 核心 (Warp) — 需求分解
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive debugger with per-warp view. Supports the `w <id>` command to select and inspect the register state and active mask of a specific warp.
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with warp-level state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 从 Phase 1 的纯 SIMD 向量处理器，升级为 **SIMT (Single Instruction, Multiple Threads)** 核心。

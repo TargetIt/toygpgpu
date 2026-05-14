@@ -1,5 +1,18 @@
 # Phase 3: SIMT Stack — 分支发散与重汇聚
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive debugger with SIMT stack divergence/reconvergence tracking. Supports the `stack` command to inspect the current SIMT stack state, including reconvergence PC, taken/fallthrough masks, and active path history.
+- **PRED (predication) support**: Added the `OP_SETP` instruction (opcode 0x24) for setting per-thread predicate bits, `@p0` prefix syntax for conditional execution in assembly, and per-thread predication state tracking.
+- **06_predication.asm**: Added a demo program comparing the PRED (predication) approach vs. the DPC (divergent PC) approach for handling warp-level conditional execution.
+- **Warp-level uniform registers**: Added `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions for reading/writing warp-level uniform registers (shared across all threads in a warp). Added `warp_regs` storage in the Warp class.
+- **08_warp_regs.asm**: Added a demo program showcasing warp-level uniform register read/write operations.
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with SIMT stack state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 引入 **SIMT Stack（后支配栈）**，正确处理 GPU 中 warp 内线程的分支发散（Branch Divergence）。

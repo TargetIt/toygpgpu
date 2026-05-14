@@ -1,5 +1,23 @@
 # Phase 0 测试报告
 
+## 2026-05-15 更新
+
+### learning_console.py 测试
+- **交互式调试器验证**: 确认 learning_console.py 可正确加载 phase0_scalar 模块，支持单步执行（step）、运行（run）、反汇编（disasm）等命令
+- **寄存器/内存查看**: `regs` 命令正确显示 r0-r15 状态，`mem` 命令可读取指定地址内容
+- **断点功能**: `break` 命令在指定 PC 处正确暂停执行
+- **trace 模式**: `trace on` 启用后每 cycle 输出指令执行详情，包括 ALU 操作数、寄存器更新和内存访问
+
+### trace 模式验证
+- 验证了 trace 输出格式包含以下字段：cycle 数、当前 PC、指令助记符、ALU 输入操作数、结果值、寄存器写回和内存读写
+- 标量指令在 trace 中正确显示单线程执行路径
+- 验证 trace 日志可与手动计算结果交叉比对，确认 ALU 运算正确性
+
+### 回归测试
+- 原有 45/45 测试全部通过，learning_console.py 和 trace 模式未引入回归问题
+
+---
+
 **日期**: 2026-05-05
 **测试套件**: tests/test_phase0.py
 **结果**: ✅ 45/45 全部通过

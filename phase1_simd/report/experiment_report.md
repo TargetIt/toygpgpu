@@ -1,5 +1,34 @@
 # Phase 1 实验报告
 
+## 2026-05-15: Feature Additions
+
+### vec4 复合类型操作
+- 新增 vec4_demo 程序，展示如何在 SIMD 向量处理器上实现 vec4 复合类型
+- vec4 加法：使用 VADD 指令对两个 vec4 的对应分量逐元素相加，VLEN=8 可同时处理两组 vec4
+- vec4 点积：通过 VMUL（逐元素乘）和标量 ADD/ST 组合实现，模拟 GPU 着色器中常见的 dot product 模式
+- vec4 标量乘法：VMOV 广播标量到所有 lane，然后 VMUL 执行逐元素乘法
+- 关键发现：vec4 操作天然映射到 SIMD 架构，每个 lane 处理一个分量，免去标量循环开销
+- 对比 Phase 0 标量实现：vec4 加法从 4 条标量指令 + 循环控制缩减为 1 条 VADD 指令
+
+### learning_console.py 交互式调试体验
+- Phase 1 调试器支持双寄存器堆查看：`regs` 同时显示标量寄存器 r0-r15 和向量寄存器 v0-v7
+- 向量寄存器显示格式：每个向量寄存器展示所有 8 个 lane 的值，便于观察 SIMD 并行执行效果
+- 向量指令单步调试：step 执行 VADD 时一次显示 8 个 lane 的 ALU 结果
+- trace 模式增强：向量指令 trace 以表格形式展示 lane 0-7 的并行执行详情
+
+### trace 输出分析
+- 向量指令 trace 记录格式：
+  - `Cycle`: 执行周期
+  - `PC`: 指令地址
+  - `Insn`: 向量指令助记符（如 VADD v0, v1, v2）
+  - `VecALU[0-7]`: 每个 lane 的 ALU 运算输入和输出
+  - `VecReg`: 向量寄存器写回详情（每个 lane 的目标值）
+  - `VecMem`: VLD/VST 的连续内存访问模式
+- 验证示例：VADD 执行后 trace 显示 v0[0-7] = v1[0-7] + v2[0-7]，所有 lane 结果正确
+- 连续内存访问 trace 验证：VLD 从 base_addr 开始连续加载 8 个 word，地址模式为 base + lane_idx
+
+---
+
 ## 1. 实验概述
 
 **目标**: 将 Phase 0 标量处理器扩展为 SIMD 向量处理器。

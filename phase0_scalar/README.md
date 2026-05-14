@@ -1,3 +1,25 @@
+## Quick Start
+
+Interactive debugging with learning_console.py (supports both interactive and trace/batch modes):
+
+```bash
+# Interactive single-step debugging
+python src/learning_console.py tests/programs/01_basic_arith.asm
+
+# Batch trace mode (non-interactive)
+python src/learning_console.py tests/programs/01_basic_arith.asm --trace
+
+# Run with more cycles
+python src/learning_console.py tests/programs/06_complex.asm --max-cycles 1000
+```
+
+## New in this update
+
+- **learning_console.py**: Interactive scalar CPU debugger with single-step, register/memory inspection, program disassembly display
+- **Interactive commands**: `Enter`=step, `r`=run, `i`=info, `m`=memory, `reg`=registers, `q`=quit
+- **Trace mode**: `--trace` flag for batch execution with detailed cycle-by-cycle output
+- **State snapshots**: Automatic diff tracking of register and memory changes between cycles
+
 # Phase 0: 标量处理器
 
 实现一个 8 指令的最简 CPU，对标 GPGPU-Sim 的 `simd_function_unit`（单 SP）。

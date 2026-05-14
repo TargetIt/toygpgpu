@@ -1,5 +1,13 @@
 # Phase 0: 标量处理器 — 需求分解
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive step-through debugger that allows users to single-step through program execution, inspect register state, and observe the fetch-decode-execute-writeback cycle in real time.
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with register and memory state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 实现一个最简标量处理器（Scalar CPU），作为 toygpgpu 的起点。

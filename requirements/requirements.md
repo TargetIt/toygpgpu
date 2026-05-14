@@ -4,6 +4,69 @@
 
 ---
 
+## New Features (2026-05-15) — Cross-Cutting Updates
+
+The following new features were added across all phases of the project:
+
+### Interactive Learning Console (`learning_console.py`)
+
+Each phase now includes an interactive debugger for inspecting the simulator state at the appropriate level of abstraction:
+
+| Phase | Console Features |
+|-------|-----------------|
+| Phase 0 | Step-through debugger, register/memory inspection |
+| Phase 1 | Scalar + vector register views, `vreg` command |
+| Phase 2 | Per-warp view, `w <id>` command |
+| Phase 3 | SIMT stack divergence/reconvergence tracking, `stack` command |
+| Phase 4 | Scoreboard-aware views, `sb` command |
+| Phase 5 | Memory hierarchy views, `cache`, `smem` commands |
+| Phase 6 | Kernel-level views, `perf` command |
+| Phase 7 | Pipeline stage inspection, `ib`, `oc`, `sb` commands |
+| Phase 8 | PTX-aware debugging, `ptx` command |
+| Phase 9 | Tensor-aware debugging, `mma` command |
+| Phase 10 | Visualization debugger, `trace`, `timeline`, `report` commands |
+| Phase 11 | `--trace`/`--auto` CLI flags for learning_console.py |
+
+### Predication (PRED) Support — Phases 3-11
+
+- `OP_SETP` instruction (opcode 0x24) for setting per-thread predicate bits
+- `@p0` prefix syntax in assembly for conditional execution
+- Per-thread predication bit tracking in the Warp class
+- Demo program `06_predication.asm` showing PRED vs. DPC approach
+
+### Warp-Level Uniform Registers — Phases 3-11
+
+- `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions
+- Warp-wide uniform register storage (`warp_regs` in Warp class)
+- Demo program `08_warp_regs.asm`
+
+### Vec4 ALU (Sub-Word SIMD) — Phases 1-11
+
+- `vec4_alu.py` (Vec4ALU) — 4x8-bit SIMD composite data type
+- V4PACK (0x26), V4ADD (0x27), V4MUL (0x28), V4UNPACK (0x29) instructions
+- Demo program `06_vec4_demo.asm` (Phase 1)
+
+### IBuffer `peek()` and SIMT Stack Reconvergence Fix — Phases 7-11
+
+- Added `peek()` method to IBuffer for non-destructive instruction inspection
+- Fixed reconvergence check logic for proper divergent path completion detection
+
+### PTX Parser Fix — Phase 8
+
+- Fixed inline `;` comment handling in `tokenize()` to handle real-world PTX output
+
+### `--trace` Mode — All Phases
+
+- `cpu.run(trace=True)` for per-instruction execution tracing
+- `run.sh --trace` command-line flag for enabling trace mode from scripts
+
+### Bilingual Comments and ASCII Flow Diagrams — All Phases
+
+- All `.asm` and `.ptx` programs updated with Chinese/English bilingual comments
+- ASCII flow diagrams illustrating program logic and data flow
+
+---
+
 ## 一、项目目标
 
 **核心目标**：用 Python 从头实现一个 GPGPU 功能模拟器，通过"写一遍"来理解 GPGPU-Sim 的架构设计。

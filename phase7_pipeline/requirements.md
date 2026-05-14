@@ -1,5 +1,17 @@
 # Phase 7: 流水线解耦 — I-Buffer + Operand Collector
 
+## New Features (2026-05-15)
+
+The following features were added after the initial release:
+
+- **learning_console.py**: Added an interactive pipeline stage debugger. Supports the `ib` command to inspect I-Buffer entries per warp, the `oc` command to view operand collector bank state and conflicts, and the `sb` command for scoreboard inspection.
+- **Fixed SIMT stack reconvergence bug**: Added `peek()` method to IBuffer for non-destructive instruction inspection, and fixed the reconvergence check logic to properly detect when all divergent paths have completed execution.
+- **PRED (predication) support**: Added `OP_SETP` instruction (opcode 0x24), `@p0` prefix syntax for conditional execution, and per-thread predication bit tracking (same as Phase 3).
+- **Warp-level uniform registers**: Added `WREAD` (opcode 0x2A) and `WWRITE` (opcode 0x2B) instructions for warp-level register read/write operations (same as Phase 3).
+- **vec4_alu.py and V4PACK/V4ADD/V4MUL/V4UNPACK instructions**: Added the Vec4ALU 4x8-bit SIMD composite data type and associated packed sub-word SIMD operations (opcodes 0x26-0x29).
+- **--trace mode**: Added support for `cpu.run(trace=True)` in Python and `run.sh --trace` from the command line, enabling per-instruction execution tracing with pipeline stage state dumps.
+- **Bilingual comments and ASCII flow diagrams**: All `.asm` programs were updated with Chinese/English bilingual comments and ASCII flow diagrams illustrating program logic and data flow.
+
 ## 1. 目标
 
 将 Phase 6 的简化流水线（fetch→execute 合一）升级为 GPGPU-Sim 风格的多级流水线：
