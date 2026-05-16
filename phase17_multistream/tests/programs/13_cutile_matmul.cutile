@@ -1,0 +1,27 @@
+; ============================================================
+; Phase 14: CuTile DSL — Tiled Matrix Multiplication (2x2)
+; 阶段 14：CuTile DSL — 分块矩阵乘法
+;
+; This .cutile file demonstrates the CuTile programming model.
+; The parser translates this high-level description into
+; optimized toygpgpu assembly code automatically.
+; 此 .cutile 文件演示 CuTile 编程模型。解析器将此高级
+; 描述自动翻译为优化的 toygpgpu 汇编代码。
+;
+; Matrix data (set by test harness):
+;   A = [[1,2],[3,4]] at mem[0..3]
+;   B = [[5,6],[7,8]] at mem[8..11]
+;   C = A × B stored at mem[16..19]
+;
+; Expected:
+;   C[0][0]=19, C[0][1]=22, C[1][0]=43, C[1][1]=50
+; ============================================================
+
+tile M=2, N=2, K=2
+
+kernel matmul(A:[M,K], B:[K,N], C:[M,N]) {
+    load A[0:M, 0:K] -> smem[0]
+    load B[0:K, 0:N] -> smem[4]
+    mma smem[0], smem[4] -> smem[8]
+    store smem[8] -> C[0:M, 0:N]
+}
