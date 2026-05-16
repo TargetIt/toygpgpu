@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  tma         打印 TMA 引擎统计 (Phase 20)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'tma':
+                print_tma(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,9 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    tma_stats = simt.tma_engine.stats()
+    print(f"{c('TMAEngine', 'cyan')}: loads={tma_stats['loads']} "
+          f"stores={tma_stats['stores']} boundary={tma_stats['boundary_events']}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +479,19 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_tma(simt):
+    """Print TMA engine stats (Phase 20)"""
+    from tma_engine import TMAEngine
+    print(c("--- TMA Engine (Phase 20) ---", 'bold'))
+    stats = simt.tma_engine.stats()
+    print(f"  Loads issued: {stats.get('loads', 0)}")
+    print(f"  Stores issued: {stats.get('stores', 0)}")
+    print(f"  Boundary handling events: {stats.get('boundary_events', 0)}")
+    print(f"  Tensor map base: {stats.get('tensor_map_base', 'N/A')}")
+    print(f"  Active descriptors: {stats.get('active_descs', 0)}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +533,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

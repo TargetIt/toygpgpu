@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  pipe        打印异步流水线状态 (Phase 22)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'pipe':
+                print_pipe(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,9 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    print(f"{c('AsyncPipeline', 'cyan')}: depth={simt.async_pipeline.depth} "
+          f"active_stages={simt.async_pipeline.active_stages()} "
+          f"warps_waiting={simt.async_pipeline.warps_at_barrier}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +479,20 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_pipe(simt):
+    """Print pipeline stage status and async barrier state (Phase 22)"""
+    from async_pipeline import AsyncPipeline
+    print(c("--- Async Pipeline (Phase 22) ---", 'bold'))
+    pipe = simt.async_pipeline
+    print(f"  Pipeline depth: {pipe.depth}")
+    print(f"  Stages active: {pipe.active_stages()}")
+    print(f"  Async barrier count: {pipe.async_barrier_count}")
+    print(f"  Warps waiting on barrier: {pipe.warps_at_barrier}")
+    for i, stage in enumerate(pipe.stages):
+        print(f"    Stage {i}: {stage.status()}  buffer={stage.buffer_words}w")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +534,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

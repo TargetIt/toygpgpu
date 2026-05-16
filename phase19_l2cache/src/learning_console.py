@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  l2          打印 L2 Cache 统计 (Phase 19)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'l2':
+                print_l2_cache(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,9 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    l2_stats = simt.l2_cache.stats()
+    print(f"{c('L2Cache', 'cyan')}: hit_rate={l2_stats['hit_rate']:.2%} "
+          f"misses={l2_stats['misses']} writebacks={l2_stats['writebacks']}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +479,19 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_l2_cache(simt):
+    """Print L2 Cache stats (Phase 19)"""
+    from l2_cache import L2Cache
+    print(c("--- L2 Cache (Phase 19) ---", 'bold'))
+    stats = simt.l2_cache.stats()
+    print(f"  Hit rate: {stats.get('hit_rate', 0):.2%}")
+    print(f"  Access count: {stats.get('access_count', 0)}")
+    print(f"  Misses: {stats.get('misses', 0)}")
+    print(f"  Writebacks: {stats.get('writebacks', 0)}")
+    print(f"  Avg fill cycles: {stats.get('avg_fill_cycles', 0):.1f}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +533,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

@@ -31,6 +31,8 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  dsm         打印分布式共享内存状态 (Phase 24)
+  cbar        打印 Cluster Barrier 状态 (Phase 24)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +162,12 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'dsm':
+                print_dsm(simt)
+                continue
+            elif cmd.lower() == 'cbar':
+                print_cbar(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +211,12 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    print(f"{c('DSM', 'cyan')}: size={simt.cluster.dsm.size} "
+          f"blocks={simt.cluster.dsm.num_blocks} "
+          f"window={simt.cluster.dsm.window_size}")
+    cb = simt.cluster.barrier
+    print(f"{c('ClusterBarrier', 'cyan')}: state={cb.state} "
+          f"arrived={cb.arrived}/{cb.total_blocks} phase={cb.phase}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +486,30 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_dsm(simt):
+    """Print distributed shared memory state (Phase 24)"""
+    from block_cluster import DistributedSharedMemory
+    print(c("--- Distributed Shared Memory (Phase 24) ---", 'bold'))
+    dsm = simt.cluster.dsm
+    print(f"  DSM size: {dsm.size} bytes")
+    print(f"  Participating blocks: {dsm.num_blocks}")
+    print(f"  Local window offset: {dsm.local_window_offset}")
+    print(f"  Window size: {dsm.window_size} bytes")
+    for i, seg in enumerate(dsm.segments):
+        print(f"    Segment {i}: block={seg.block_id} offset={seg.offset} size={seg.size}")
+
+
+def print_cbar(simt):
+    """Print cluster barrier state (Phase 24)"""
+    from block_cluster import ClusterBarrier
+    print(c("--- Cluster Barrier (Phase 24) ---", 'bold'))
+    cb = simt.cluster.barrier
+    print(f"  Barrier state: {cb.state}")
+    print(f"  Arrived blocks: {cb.arrived}/{cb.total_blocks}")
+    print(f"  Phase: {cb.phase}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +551,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  sparse      打印稀疏化统计 (Phase 25)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'sparse':
+                print_sparse(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,11 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    sm = simt.sparse_manager
+    print(f"{c('Sparsity', 'cyan')}: mode={sm.mode} "
+          f"2:4_patterns={sm.pattern_count_2to4} "
+          f"nnz_ratio={sm.non_zero_ratio():.2%} "
+          f"structured={sm.structured_enabled}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +481,21 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_sparse(simt):
+    """Print sparsity stats and 2:4 patterns (Phase 25)"""
+    from sparsity import SparseManager, SparseOp
+    print(c("--- Sparsity (Phase 25) ---", 'bold'))
+    sm = simt.sparse_manager
+    print(f"  Sparsity mode: {sm.mode}")
+    print(f"  2:4 pattern count: {sm.pattern_count_2to4}")
+    print(f"  Non-zero ratio: {sm.non_zero_ratio():.2%}")
+    print(f"  Metadata format: {sm.metadata_format}")
+    print(f"  Structured sparsity: {sm.structured_enabled}")
+    for i, p in enumerate(sm.patterns_2to4[:4]):
+        print(f"    Pattern {i}: mask=0b{p.mask:04b} nnz={p.non_zero_count}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +537,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

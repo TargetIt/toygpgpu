@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  it          打印每线程 PC 状态 (Phase 23)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'it':
+                print_independent_thread(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,12 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    its = simt.independent_thread_sched
+    print(f"{c('IndependentThread', 'cyan')}: mode={'enabled' if its.enabled else 'SIMT_fallback'}")
+    for w in simt.warps:
+        for t in w.threads:
+            if not t.done:
+                print(f"  T{t.thread_id}: PC={t.pc}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +482,20 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_independent_thread(simt):
+    """Print per-thread PC state (Phase 23)"""
+    from independent_thread import IndependentThreadScheduler
+    print(c("--- Independent Thread (Phase 23) ---", 'bold'))
+    its = simt.independent_thread_sched
+    print(f"  Mode: {'enabled' if its.enabled else 'disabled (SIMT fallback)'}")
+    for w in simt.warps:
+        print(f"  Warp {w.warp_id}:")
+        for t in w.threads:
+            if not t.done:
+                print(f"    T{t.thread_id}: PC={t.pc} done={t.done}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +537,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(

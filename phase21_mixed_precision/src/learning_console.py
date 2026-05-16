@@ -31,6 +31,7 @@ Learning Console — 交互式 GPU 流水线学习控制台
   cutile     打印 CuTile 模型信息 (Phase 14)
   graph      打印 Compute Graph IR 信息 (Phase 15)
   sched       打印 Graph Scheduler 信息 (Phase 16)
+  fp8         打印 FP8 精度分析 (Phase 21)
   b <pc>     在指定 PC 设置断点
   b list     列出所有断点
   b clear    清除所有断点
@@ -160,6 +161,9 @@ def run_console(simt, program_text, args):
             elif cmd.lower() == 'sched':
                 print_sched_info()
                 continue
+            elif cmd.lower() == 'fp8':
+                print_fp8(simt)
+                continue
             elif cmd.lower().startswith('b '):
                 sub = cmd[2:].strip()
                 if sub == 'list':
@@ -203,6 +207,11 @@ def run_console(simt, program_text, args):
     print_memory(simt)
     print(f"\n{c('L1Cache', 'cyan')}: {simt.l1_cache.stats()}")
     print(f"{c('OpCollector', 'cyan')}: {simt.op_collector.stats()}")
+    fp8_stats = simt.fp8_converter.stats()
+    print(f"{c('FP8Converter', 'cyan')}: conv={fp8_stats['conversions']} "
+          f"e4m3={fp8_stats['e4m3_round']} e5m2={fp8_stats['e5m2_round']}")
+    print(f"{c('PrecisionErr', 'cyan')}: max_rel_err={simt.precision_analyzer.max_rel_error():.6f} "
+          f"overflows={simt.precision_analyzer.overflow_count()}")
 
 
 def _do_step(simt, cycle, prev_regs, prev_mem, breakpoints):
@@ -472,6 +481,20 @@ def print_sched_info():
     mem = plan_memory(g, 64)
     print(f"  Memory plan: {mem}")
 
+
+def print_fp8(simt):
+    """Print FP8 conversion stats and precision analysis (Phase 21)"""
+    from mix_precision import FP8Converter, PrecisionAnalyzer
+    print(c("--- Mixed Precision (Phase 21) ---", 'bold'))
+    conv_stats = simt.fp8_converter.stats()
+    print(f"  FP8 conversions: {conv_stats.get('conversions', 0)}")
+    print(f"  E4M3 roundings: {conv_stats.get('e4m3_round', 0)}")
+    print(f"  E5M2 roundings: {conv_stats.get('e5m2_round', 0)}")
+    prec = simt.precision_analyzer
+    print(f"  Max relative error: {prec.max_rel_error():.6f}")
+    print(f"  Overflow events: {prec.overflow_count()}")
+
+
 # ─── Main ───
 
 def main():
@@ -513,7 +536,7 @@ def main():
         else:
             i += 1
 
-    with open(asm_file) as f:
+    with open(asm_file, encoding='utf-8') as f:
         program_text = f.read()
 
     simt = SIMTCore(
